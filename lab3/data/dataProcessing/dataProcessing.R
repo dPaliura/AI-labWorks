@@ -1,5 +1,5 @@
 # Set path to local repo instead of [directory]
-dir <- "/lab3/data/dataProcessing"
+dir <- "[directory]/lab3/data/dataProcessing"
 setwd(dir)
 
 classes = c("perl", "normal")
