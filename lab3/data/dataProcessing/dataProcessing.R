@@ -1,9 +1,8 @@
-# Set path to this repo instead of [directory]
-dir <- "[directory]/lab3/data/dataProcessing"
+# Set path to local repo instead of [directory]
+dir <- "/lab3/data/dataProcessing"
 setwd(dir)
 
-
-classes = c("smurf", "normal")
+classes = c("perl", "normal")
 
 # Read data
 fields <- read.csv("dataSet/FieldNames.csv", head=FALSE)
