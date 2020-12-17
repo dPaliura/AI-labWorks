@@ -1,0 +1,337 @@
+---
+title: "Laboratory work 3: Cyber attack of type 'perl' recognition with two-layer-perzeptron on NLS KDD data-set"
+author: "Daniel Paliura"
+date: "16 12 2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Purpose
+
+To develop software for realisation of neural networks of types two-layer-perzeptron (TLP) and probability neural network (PNN) dedicated to recognition of cyber attacks, whichs signatures given in data base NLS KDD or KDD-99.
+
+
+## Task
+
+Recognition of cyber attack of type 'perl' using TLP. Show NN error after 1, 50 and 100 epochs.
+
+
+## Introduction
+
+As data base was selected NLS KDD. In this report it will be called 'data-set' or simply 'set'. It was downloaded from [Git-hub repository (clickable)](https://github.com/defcom17/NSL_KDD).
+To provide data into neural network (NN) data-set must contain only numbers, not symbolic data, so symbolic fields of data-set must be encoded. Also all fields should be normalized to provide stable data into NN.
+Also there is **restriction** for encoding: processed data-set must contain number of fields equal to number of fields in initial data-set, so one-hot encoding not allowed to use even it is a single way to encode data correctly.
+And also NN must be written by hand, without using special libraries providing NN solutions.
+
+## Solution
+
+### Neural network implementation
+
+To write specified in **task** NN I used Python language (v.3.8.3) with next libraries:
+
+* numpy 1.19.2
+* pandas 1.1.4
+
+TLP implemented as `class TLP` and has next attributes and methods:
+
+* `sigmoid(X)` - static method - logistic function $\sigma = \frac{1}{1+e^{-x}}$
+* `sigmoid_deriv(X)` - static method - derivative of logistic function (not used)
+* `feed_forward(self, X, show_progress=False)` - method wich returns TLP output for input `X`. `X` expected to be numpy array and can be one-dimensional array in case single input and two-dimensional numpy array in case multiple inputs. In this case different inputs must be given as rows of array. Parameter `show_progress` indicates whether progress of execution must be shown (prints percentage when it incremented). Actual only for multiple inputs.
+* `_feed_forward(self, X)` - protected method which implements neurons activation. This function takes single input and called is from `feed_forward`'s body.
+ * `back_propagation(self, X, Y, train_rate=2)` - method for single weights correction by back propagation principle. It takes single input vector `X` and according output *vector* `Y` of expected output. `train_rate` is parameter of training velocity, it is just coefficient before derivative in fomulae of deltas.
++ `back_prop_epoch(self, X, Y, train_rate=2, show_progress=False)` - method wich takes matrix `X` of multiple training inputs and matrix `Y` of according outputs. This method just calls `back_propagation` method for each train input-output pair. Parameter `train_rate` provides into specified method. `show_progress` is analogue for eponymous parameter in `feed_forward` method.
+
+
+### Data processing
+
+Data-set NLS KDD has 42 fields, where 42-th one is class of cyber attack ('normal' if no cyber atack). It contains tree fields (2-th, 3-th, 4-th) of type 'symbolic'. 
+Analysis of set wasn't performed due to **restriction**. Also it wasn't provided for this laboratory work.
+Data-set was already devided into train set, validation subset (20% of train set) and test set. Sets are given without field names, but field names given in other file. I added names to data frame, which I processed and save processed data into files including field names.
+
+Summary of NLS KDD train subset:
+```{r NLS KDD train summary}
+KDD.train <- read.csv("../data/dataProcessing/dataSet/KDDTrain+.csv")[-43]
+KDD.names <- read.csv("../data/dataProcessing/dataSet/FieldNames.csv",
+                      header = FALSE)
+names(KDD.train) <- c(as.character(KDD.names[,1]), "class")
+summary(KDD.train)
+
+cat("\nNumber of records in KDD train set is ", nrow(KDD.train))
+rm(KDD.train, KDD.names)
+```
+
+There are field 'num_outbound_cmds' has only zeros and it should be removed, but I can't do so due to **restriction**, but now I know that I have to take it into account when normalizing data. 
+
+#### Filtering
+
+First of all I filtered needed classes, so that I had only 'normal' and 'perl' in result. Also I used `na.exclude()` function to exlude NA's, but it was no NA's in data-set.
+
+#### Encoding
+
+Fields from 2-th to 4-th was encoded with integers by unique criteria. This way grounded for PNN with small Gaussian radius like 0.3, because PNN uses voting power by simillarity of input to patterns (expert knowledge). While for TLP order matters. And it is incorrect to give some order to factors. If there is some logic in protocols order like:
+
+* 1 - UDP, because one of simplests
+* 2 - ICMP, because not one of simplest but one still one of TCP/IP stack
+* 3 - TCP is one of the main protocols of the Internet protocol suite
+
+but they are encoded like this (by alphabetical order):
+
+* 1 - ICMP
+* 2 - TCP
+* 3 - UDP
+
+so any ordering logic erased and such encoding only can muddle weights of TLP.
+
+But still I had to do so and I done so.
+
+Class of signature was to be encoded too, because it is not TLP's purpose to do so. Class 'normal' was encoded with 1 and class 'perl' was encoded with 0 (zero). TLP output interpreted in next way: if output rounds to 0, so it is 'perl', otherwise (if rounded to 1) it is 'normal'.
+
+#### Normalization
+
+Normalization is described by formula:
+
+$$X_{normalized} = \frac{X-\min(X)}{\max(X)-\min(X)}$$
+
+This formula was applied to columns where $\min(X)\neq\max(X)$.
+
+#### Processed data-set summary
+
+After processing NLS KDD I got 3 .csv files for training NN, validation and testing. But there was an issue: no attacks appeared in validation subset. So I was compelled to insert one record with class 'perl' from training set into validation subset istead of one 'normal' record. The reason why only 1 record was inserted consists in next:
+
+```{r show KDD processed sizes}
+KDD.subset <- read.csv("../data/input/KDDTrain_procsd.csv")
+attacks.num <- sum(!KDD.subset$class)
+normals.num <- sum(KDD.subset$class)
+cat("KDD train subset has ", normals.num, " records of class 'normal' and ",
+    attacks.num, " records of class 'perl'.\n",
+    "Rate attack/normal is ",attacks.num/normals.num, "\n\n",
+    sep='')
+
+KDD.subset <- read.csv("../data/input/KDDTrain_20PERCENT_procsd.csv")
+attacks.num <- sum(!KDD.subset$class)
+normals.num <- sum(KDD.subset$class)
+cat("KDD validation subset has ", normals.num, " records of class 'normal' and ",
+    attacks.num, " records of class 'perl'.\n",
+    "Rate attack/normal is ",attacks.num/normals.num,"\n\n",
+    sep='')
+
+KDD.subset <- read.csv("../data/input/KDDTest_procsd.csv")
+attacks.num <- sum(!KDD.subset$class)
+normals.num <- sum(KDD.subset$class)
+cat("KDD test subset has ", normals.num, " records of class 'normal' and ",
+    attacks.num, " records of class 'perl'.\n",
+    "Rate attack/normal is ",attacks.num/normals.num, "\n\n",
+    sep='')
+
+rm(KDD.subset, attacks.num, normals.num)
+```
+
+It means that data-set has very few attacks to train TLP normally on full data-set and hence to test it normally too.
+
+#### Data-set supplement
+
+I decided to supplement training data-set with repeated records of class 'perl'. I chosen supplement rate as 1 attack per 10 normal records. To do so I splitted processed KDD train without attacks into sequences of about 60 elements and added to all of them all 3 records with attack and joined this sequences into single data frame. After that I shuffled got data frame and wrote it into .csv file. I also tried to supplement train set with rates 1/20 and 1/5, but results wasn't very impressive so I left only this case.
+
+
+After all data transformations I got 3 new subsets of KDD. All they are look similar. Summary for supplemented train subset:
+```{r NLS KDD transformed train summary}
+KDD.train <- read.csv("../data/input/KDDTrain_supplmntd_10perc.csv")[-1]
+summary(KDD.train)
+
+cat("\nNumber of records in KDD train set is ", nrow(KDD.train), "\n\n")
+
+attacks.num <- sum(!KDD.train$class)
+normals.num <- sum(KDD.train$class)
+cat("KDD validation subset has ", normals.num, " records of class 'normal' and ",
+    attacks.num, " records of class 'perl'.\n",
+    "Rate attack/normal is ",attacks.num/normals.num,"\n\n",
+    sep='')
+rm(KDD.train, attacks.num, normals.num)
+```
+
+As we can see, 'attack/normal' rate is about 0.1 now and data-set got fat. It might appear a question why fields 'duration', 'service', 'flag', 'hot' and 'num_file_creations' has maximum value less than 1. It is because it's just a part of full data-set. Normalization was applied to glued train, validation and test subsets. So maximums for these rows left in test subset. I checked summary for it and it really is.
+
+
+### Computations
+
+I trained two-layer prezeptron and executed recognition about 6 times, but save results only for 3 cases. It takes a lot of time but I was persistent and tried many times to get expected result.
+
+At first time I trained TLP on just processed data set.
+At second time I trained it on supplemented (with rate 1/10) train set.
+At third time I trained it on same train set for 3000 epochs instead of 100.
+
+It's obviously that at third time I done the same and more than in second time.
+
+
+### PNN solution
+
+Before showing results of training TLP I will tell about provided PNN for this task to compare results. I applied PNN from laboratory work 2 on 3000 records from processed train set (it was records from 35000 to 36999 and from 54000 to 54999).
+
+PNN implemented on different classes.
+
+#### Neurons  
+
+`class Neuron` implements classical neuron. It requires to specify number of incoming synaptic links `inputs_num` and allows to specify transfer function, activation function, bias (`shift`) and weights (set randomly by default). It has next methods:
+
+* `get_inputs_num(self)` - simple getter for `inputs_num`
+* `_set_random_weights(self, bipolar=True)` - protected method dedicated to set weights randomly on initialization
+* `feed(self, X)` - returns neurons activation value (out signal) for incoming signal `X`. `X` expected to be one-dimensional list. It does not compute outcome itself, but calls `_feed`
+* `_feed(self, X)` - protected method that implements calculations for `feed` method
+
+`class InputNeuron(Neuron)` is dedicated for input neuron, and it can be initialized without any provided parameters. It has linear activation function and skips use of transfer functions because it has single input (equivalent of sensitive cell). Also it can have name for input variable and has according getter and setter. As mentioned its `feed` method doesn't use transfer function.
+
+`class PatternNeuron(Neuron)` corresponds to a neuron in patten layer. It's necessary to specify weights (values list of training example) to initialize it. Also it uses such combination of transfer function and activation function that it is the Gaussian function ultimately.
+Gaussian function:
+
+$$ G(X) = \sum\exp(\frac{-(W-X)^2}{\sigma^2})$$
+
+where $\sigma$ -- gaussian radius, $X$ -- predictor vector, $W$ -- weights.
+
+I used next transfer and activation:
+$$Transfer(X) = W-X$$
+$$Activate(X) = \sum\exp(\frac{-(X)^2}{\sigma^2})$$
+So composition is:
+$$Activate(Transfer(X)) = G(X)$$
+
+`class SummaNeuron(Neuron)` corresponds to neuron in summation layer. It initialized with number of incoming synaptic links as parameter `inputs_num`. It has summa transfer function and linear activation function with coefficient $\frac{1}{inputs\_num}$.
+
+`class OutputNeuron(Neuron)` corresponds to output neuron. It initialized with number of inputs equal to number of classes. It has 'whichmax' transfer function which returns number of element with max value in inputs. Activation function just returns name of class according to transfered number. This neuron can be initialized with set of classes names, but by default it return number of class with max vote. Also it has setter `set_class_names(self, class_names)` for `_class_names` attribute.
+
+#### Layers  
+
+`class NeuronsLayer` implements interface to bind several neurons into single layer to work with all of them through single object. `NeuronsLayer` initialized with one-dimensional array of objects of class `Neuron`. It has just one public method `feed(self, X, overall_input=False)` which runs through all neurons in layer and calls their `feed` method. It feeds to them same input `X` in case parameter `overall_inputs` set as True, otherwise it expect that `X` is two-dimensional list and feed rows to each neuron.  
+To use `overall_inputs = True` each neuron in layer must have same `inputs_num`.
+
+#### Probability neural network  
+
+`class PNN` initialized with two-dimensional array `train_in` of predictors in each row and list `train_out` of classes corresponding to predictors. It is available to mention names of input variables `input_names` and gaussian radius `gaussian_radius=0.3` while initialization.
+
+It has single public method `recognize(self, X)` which juxtaposes classes to predictors `X`. If `X` is one-dimensional, than it returns single class name, else if `X` is two-dimensionsl, than it expects predictors in rows and returns list of class names.
+
+
+## Results analysis
+
+It's not convenient to see such amount of numbers at least because it takes a lot of time, so I will use boxplots. Boxplots are very informative to view errors of TLP. It's well interpreted and also it reliable due to just one attack in validation set and pair attacks in test set.
+
+### Boxplots interpretation rules
+
+Error was calculated with formula $err = Y - Y_{web}$,
+where $Y$ - expected, $Y_{web}$ - TLP output.
+
+* If **expected 'normal'** (encoded as 1) and NN **recognized it**, so its output is between 0.5 and 1 hence $err \in [0, 0.5]$
+* If **expected 'normal'** (encoded as 1) and NN **did not recognize it**, so its output is between 0 and 0.5 hence $err \in [0.5, 1]$
+* If **expected 'perl'** (encoded as 0) and NN **recognized it**, so its output is between 0 and 0.5 hence $err \in [-0.5, 0]$
+* If **expected 'perl'** (encoded as 0) and NN **did not recognize it**, so its output is between 0.5 and 1 hence $err \in [-1, -0.5]$
+
+Also remind description of boxplot on example:
+
+```{r boxplot example}
+set.seed(42)
+boxplot(c(runif(200), 1.6))
+```
+
+* Bold line inside of box is median (second quartile)
+* box is interquartile range, that means lower bound of box is first quartile, and upper one is third quartile
+* Whiskers shows the farthest observation wich is not farther then 1.5 times interquartile range from the box
+* points shown farther than whiskers end and often recognized as ejections (but not in our case)
+
+So less words and more plots.
+
+### Error plots for TLP trained on not supplemented train set
+
+Validation first.
+`error_1`, `error_50` and `error_100` respective to errors after 1-th, 50-th and 100-th train epochs.
+
+```{r validation error plots for TLP trained on not supplemented set}
+KDD.validated <- read.csv("../data/output/KDD_validation.csv")
+boxplot(KDD.validated[,c("error_1", "error_50", "error_100")], 
+        main="Validation of TLP trained on not supplemented set",
+        ylab="Error")
+rm(KDD.validated)
+```
+
+Using mentioned **boxplots interpretation rules** we can say that all examples in this case was recognized as 'normal' and hence single 'perl' wasn't recognized. Bad result. And also there is no outputs significally different from 1. TLP failed validation.
+
+Next - testing
+
+```{r testing error plots for TLP trained on not supplemented set}
+KDD.tested <- read.csv("../data/output/KDD_testing.csv")
+KDD.attacks <- KDD.tested[!KDD.tested$expected,]
+attacks.num <- nrow(KDD.attacks)
+
+boxplot(KDD.tested[,c("error_1", "error_50", "error_100")], 
+        main="Testing of TLP trained on not supplemented set",
+        ylab="Error")
+
+cat("Number of recognized attacks\n", 
+    "after epoch 1: ", 
+    sum(KDD.attacks$recognized_1 == KDD.attacks$expected),
+    '/', attacks.num, '\n',
+    "after epoch 50: ", 
+    sum(KDD.attacks$recognized_50 == KDD.attacks$expected),
+    '/', attacks.num, '\n',
+    "after epoch 100: ", 
+    sum(KDD.attacks$recognized_100 == KDD.attacks$expected),
+    '/', attacks.num,
+    sep='')
+
+rm(KDD.tested, KDD.attacks, attacks.num)
+```
+
+Nothing new. It doesn't work at all.
+
+### Error plots for TLP trained on supplemented train set
+
+As I said, I tried to train TLP also for 3000 epochs. This case wasn't essential but I tried it and it will be reviewed.
+
+Validation:
+
+```{r validation error plots for TLP trained on supplemented set}
+KDD.validated <- read.csv("../data/output/KDD_suppl_10_percnt_3K_epoch_validation.csv")
+boxplot(KDD.validated[,c("error_1", "error_50", "error_100", "error_3000")], 
+        main="Validation of TLP trained on supplemented set",
+        ylab="Error")
+rm(KDD.validated)
+```
+
+There are some fluctuations, but NN still doesn't work correctly. Yeah! it recognizes almost all set! But it does not recognize attack. In such way this NN is not more than trash. Validation failed. And there is no expectations of succes testing.
+
+Testing:
+
+```{r testing error plots for TLP trained on supplemented set}
+KDD.tested <- read.csv("../data/output/KDD_suppl_10_percnt_3K_epoch_testing.csv")
+KDD.attacks <- KDD.tested[!KDD.tested$expected,]
+attacks.num <- nrow(KDD.attacks)
+
+boxplot(KDD.tested[,c("error_1", "error_50", "error_100", "error_3000")], 
+        main="Testing of TLP trained on supplemented set",
+        ylab="Error")
+
+cat("Number of recognized attacks\n", 
+    "after epoch 1: ", 
+    sum(KDD.attacks$recognized_1 == KDD.attacks$expected),
+    '/', attacks.num, '\n',
+    "after epoch 50: ", 
+    sum(KDD.attacks$recognized_50 == KDD.attacks$expected),
+    '/', attacks.num, '\n',
+    "after epoch 100: ", 
+    sum(KDD.attacks$recognized_100 == KDD.attacks$expected),
+    '/', attacks.num,
+    sep='')
+```
+
+And nothing interesting again. Fluctuations again. I suggested that it's incorrectness in web output interpretation. What if ranges from 0 to 0.5 and from 0.5 to 1 are not correct to interpret attack and normal? Let's check.
+Let's take a look onto summary of web outputs and outputs of web when it was attack and compare. I expect that outputs for attack will be less than most of normals.
+
+```{r check suggestion}
+summary(KDD.tested[, c("recognized_50", "recognized_100", "recognized_3000")], digits = 7)
+print(KDD.attacks[, c("recognized_50", "recognized_100", "recognized_3000")])
+
+rm(KDD.tested, KDD.attacks, attacks.num)
+```
+
+Everything is clear there. Values of outputs when attack fall into second quartiles. That means NN recognized attacks like common normals. If this values were very close to min values, than it could be encouraging, but no. This purpose to learn TLP on three examples of attacks and 67 thouthands of normals to recognize attack is desperate. 
+I thought that only PNN can overcome these difficulties. PNN does not try to change weights to adjust, it says coolly: "There are 17 of 30 guys from class 'A' say this example looks like class 'A'. And there are 25 of 90 guys from class 'B' say this example looks like class 'B'. And it doesn't matter that amount of guys from class 'B' thrise more, because we are liberals (or something like this) and we respect voting classes of guys at all instead of stupid massess of individuals". So the idea in that: this classification not linearly separable, but it can be solvable in scope.
