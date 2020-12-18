@@ -7,15 +7,15 @@ from tlp import TLP
 if __name__ == '__main__':
     np.random.seed(42)
     try:
-        train_set = np.array(read_csv("data/input/KDDTrain_procsd.csv"))
-        valid_set = np.array(read_csv("data/input/KDDTrain_20PERCENT_procsd.csv"))
-        test_set = np.array(read_csv("data/input/KDDTest_procsd.csv"))
+        train_set = np.array(read_csv("data/input/KDDTrain_procsd.csv"))[:,1:]
+        valid_set = np.array(read_csv("data/input/KDDTrain_20PERCENT_procsd.csv"))[:,1:]
+        test_set = np.array(read_csv("data/input/KDDTest_procsd.csv"))[:,1:]
 
         n = int(train_set.shape[1]-1)
-        p = int(n**.75)
+        p = n+1
         m = 1
 
-        input("n = {}. Press 'Enter to start'".format(n))
+        input("Input layer size {}\nHidden layer size {}\nOutput layer size {}\nPress 'Enter' to start training and recognition".format(n, p, m))
 
         train_set_in = train_set[:,0:n]
         train_set_out = train_set[:,n]
