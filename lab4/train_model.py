@@ -20,7 +20,7 @@ batch_size = 32
 # number of image classes
 nb_classes = 10
 # Epochs number
-nb_epoch = 100
+nb_epoch = 30
 # Image size
 img_rows, img_cols = 32, 32
 # Number of image color channels (RGB)
@@ -77,7 +77,7 @@ model.add(Dropout(0.5))
 model.add(Dense(nb_classes, activation='softmax'))
 
 # Optimization parameters
-sgd = SGD(learning_rate=0.02, decay=1e-6, momentum=0.5, nesterov=True)
+sgd = SGD(learning_rate=0.03, decay=1e-6, momentum=0.3, nesterov=True)
 model.compile(loss='categorical_crossentropy', 
                 optimizer=sgd, metrics=['accuracy'])
 
@@ -96,6 +96,6 @@ print("Accuracy on test data: %.2f%%" % (scores[1]*100))
 print("Time spent", end-start)
 
 # Save model
-model.save('model_lr0.02_mom0.5_100.h5')
+model.save('model_lr0.03_mom0.3_300.h5')
 
 input("Press 'Enter' to close")
