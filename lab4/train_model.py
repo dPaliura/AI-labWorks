@@ -99,6 +99,13 @@ print("Accuracy on test data: %.2f%%" % (scores[1]*100))
 print("Time spent", end-start)
 
 # Save model
-model.save(_images_dir+'/'+'model_lr0.03_mom0.3_300.h5')
-
-input("Press 'Enter' to close")
+while True:
+    try:
+        model.save(_images_dir+'/'+input("Enter model name\n")+".h5")
+    except Exception as e:
+        print("Exception occured while saving.\n")
+        print("Original text:\n", e,"\n")
+        print("Try again")
+    else:
+        input("It's OK. Press 'Enter' to close\n")
+        break
