@@ -8,6 +8,9 @@ from keras.optimizers import SGD
 
 import datetime as dt
 
+from project_dirs import _images_dir
+
+
 start = dt.datetime.now()
 
 np.random.seed(42)
@@ -96,6 +99,6 @@ print("Accuracy on test data: %.2f%%" % (scores[1]*100))
 print("Time spent", end-start)
 
 # Save model
-model.save('model_lr0.03_mom0.3_300.h5')
+model.save(_images_dir+'/'+'model_lr0.03_mom0.3_300.h5')
 
 input("Press 'Enter' to close")
